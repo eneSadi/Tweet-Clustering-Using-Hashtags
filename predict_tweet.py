@@ -15,6 +15,12 @@ def remove_punctuation(text):
   return text.translate(str.maketrans('', '', PUNCT_TO_REMOVE))
 
 def predict_tweet(text, dict_for_clusters, kmeans):
+
+  '''
+    - text (str)               : string for prediction
+    - dict_for_clusters (dict) : dictionary for cluster labels of hashtags
+  '''
+
   stop_words=pd.read_csv('turkish-stopwords.txt', sep=" ", header=None)
   stop_words.columns=['words_list']
 

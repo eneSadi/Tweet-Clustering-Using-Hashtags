@@ -11,6 +11,13 @@ parser.add_argument('--preprocessed_path', type=str, required=True)
 args = parser.parse_args()
 
 def assign_dict_clusters(assign_dict, kmeans, merged_df):
+
+  '''
+    - assign_dict (dict)    : dictionary for labels of hashtags
+    - kmeans (model)        : fitted kmeans model for taking its cluster labels
+    - merged_df (DataFrame) : used dataframe for training 
+  '''
+
   assign_dict_clusters = {}
 
   for cluster in np.unique(kmeans.labels_):

@@ -20,6 +20,13 @@ def remove_punctuation(text):
   return text.translate(str.maketrans('', '', PUNCT_TO_REMOVE))
 
 def clean_tweets(file_path, keywords, stemming):
+
+  '''
+    - file_path (str) : given path for csv file which has tweets included
+    - keywords (list) : keyword list which is used while scraping tweets
+    - stemming (str)  : stemming operation option, must be True or False
+  '''
+
   df = pd.read_csv(file_path, sep='\t')
 
   df = df.drop_duplicates().reset_index(drop=True)
@@ -101,6 +108,8 @@ def clean_tweets(file_path, keywords, stemming):
   [drop_list.append(k) for k,i in enumerate(df['vectors']) if i.sum() == 0]
   print("Dropped lines " + str(len(drop_list)))
   df = df.drop(drop_list).reset_index(drop=True)
+
+  print("Number of tweets: " + str(len(df)))
 
   return df.drop(['vectors'], axis=1), df['vectors']
 
