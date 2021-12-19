@@ -40,6 +40,7 @@ def scrape_tw(since, until, keywords, output_dir):
       os.rename(output, new_name)
       print("File saved here: " + new_name)
       until = ctrl
+      keep = 1
 
       
 if __name__=="__main__":
@@ -51,7 +52,7 @@ if __name__=="__main__":
     parser.add_argument("--keywords", "-k", help="keywords to search, must be passed with dash (-) -> eth-ethereum", type=str)
     args = parser.parse_args()
 
-    keys = args.split('-')
+    keys = args.keywords.split('-')
 
     print('Beginning of scraping.')
     scrape_tw(args.since, args.until, keys, args.output_dir)
