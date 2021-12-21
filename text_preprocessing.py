@@ -3,62 +3,66 @@ import pandas as pd
 import re
 import numpy as np
 import string
+from sklearn.cluster import KMeans
 from gensim.models import KeyedVectors
+from gensim.scripts.glove2word2vec import glove2word2vec
+import string
+import nltk
+nltk.download('wordnet')
+nltk.download('stopwords')
+from keras.preprocessing.text import Tokenizer
+import scipy.stats
+from utils.preprocessing_utils import * 
 import argparse
+import pickle
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--file_path', type=str, required=True)
-parser.add_argument('--keywords', type=str, required=True)
-parser.add_argument('--label', type=int, required=True)
+parser.add_argument('--model_path', type=str, required=True)
+parser.add_argument('--assing_labels_dict', type=str, required=True)
 parser.add_argument('--stemming', type=str, required=True)
 parser.add_argument('--output_dir', type=str, required=True)
 
 args = parser.parse_args()
 
-def remove_punctuation(text):
-  PUNCT_TO_REMOVE = string.punctuation
-  return text.translate(str.maketrans('', '', PUNCT_TO_REMOVE))
-
-def clean_tweets(file_path, keywords, stemming):
-
+def prepare_data(df, model, stemming):
   '''
-    - file_path (str) : given path for csv file which has tweets included
-    - keywords (list) : keyword list which is used while scraping tweets
-    - stemming (str)  : stemming operation option, must be True or False
+    - df    : DataFrame for preparation
+    - model : Word vectors for calculating sentence vectors
   '''
-
-  df = pd.read_csv(file_path, sep='\t')
 
   df = df.drop_duplicates().reset_index(drop=True)
+  df['text'] = df['text'].str.lower()
+  df['text'] = [text.replace('_', ' ') for text in df['text']] # '_' can be used between words
 
-  remove_features = ['id', 'conversation_id', 'created_at', 'date', 'time', 'timezone',
-       'user_id', 'username', 'name', 'place', 'language',
-       'urls', 'photos','mentions',
-       'cashtags', 'link', 'retweet', 'quote_url', 'video',
-       'thumbnail', 'near', 'geo', 'source', 'user_rt_id', 'user_rt',
-       'retweet_id', 'reply_to', 'retweet_date', 'translate', 'trans_src',
-       'trans_dest', 'replies_count', 'retweets_count',	'likes_count']
-  df = df.drop(remove_features, axis=1)
-  df['tweet'] = df['tweet'].str.lower()
+  for k in range(len(df)):
+    df['text'][k] = re.sub(r'http\S+', '', str(df['text'][k])) # remove links
+    df['text'][k] = re.sub(r'@\S+', '', str(df['text'][k])) # remove usertags
+    
+  df['text'] = df['text'].apply(lambda text: remove_punctuation(text))
+
+
+  docs = df['text']
+  docs_list = []
+
+  WPT = nltk.WordPunctTokenizer()
+  stop_word_list = nltk.corpus.stopwords.words('turkish')
+      
+  for doc in docs:
+      doc = re.sub("\d+"," ",doc) # remove numbers
+      doc = WPT.tokenize(doc)
+      filtered_tokens = [item for item in doc if item not in stop_word_list]
+      lemma = nltk.WordNetLemmatizer()
+      lemma_word = [lemma.lemmatize(word) for word in filtered_tokens]
+
+      doc = " ".join(lemma_word)
+
+      docs_list.append(doc)
+
+  df['text'] = pd.DataFrame(docs_list, columns=['text'])
+
   filter = []
-  for i in df['hashtags']:
-    if (i.count(',')+1) <= len(keywords):
-      filter.append(True)
-    else:
-      filter.append(False)
-  df = df[filter]
-  df = df.reset_index(drop=True)
-
-  df['tweet'] = [i.replace(keywords[0] and keywords[1], '') for i in df['tweet']]
-  df['tweet'] = [i.replace(keywords[0] or keywords[1], '') for i in df['tweet']]
-  for k,i in enumerate(df['tweet']):
-    df['tweet'][k] = re.sub(r'http\S+', '', df['tweet'][k])
-
-  for k,i in enumerate(df['tweet']):
-    df['tweet'][k] = re.sub(r'@\S+', '', df['tweet'][k])
-
-  filter = []
-  for i in df['tweet']:
+  for i in df['text']: # remove sample if all words are stop words  
     if len(i) == 0:
       filter.append(False)
     else:
@@ -66,57 +70,50 @@ def clean_tweets(file_path, keywords, stemming):
   df = df[filter]
   df = df.reset_index(drop=True)
 
-  stop_words=pd.read_csv('turkish-stopwords.txt', sep=" ", header=None)
-  stop_words.columns=['words_list']
-
-  pat2 = r'\b(?:{})\b'.format('|'.join(list(stop_words['words_list'].str.lower())))
-  df['tweet'] = df['tweet'].str.lower().str.replace(pat2, '')
-
-  df['tweet'] = df['tweet'].apply(lambda text: remove_punctuation(text))
-
   if stemming:
     stemmer = TurkishStemmer()
-    for i, tweet in enumerate(df['tweet']):
-      word_list = tweet.split()
+    for i, text in enumerate(df['text']):
+      word_list = text.split()
       new_sentence = ""
       for word in word_list:
         new_word = stemmer.stem(word)
         new_sentence += (" " + new_word)
 
-      df['tweet'][i] = new_sentence
+      df['text'][i] = new_sentence
 
-  word_vectors = KeyedVectors.load_word2vec_format('trmodel', binary=True)
-  df['vectors'] = [np.zeros(400) for i in range(len(df))]
-
+  df['vectors'] = [np.zeros(300) for i in range(len(df))]
   not_found = 0
-
-  for i,tweet in enumerate(df['tweet']):
-    word_list = tweet.split()
-    avg_vector = np.zeros(400) 
-    count = 0
+  for i,tweet in enumerate(df['text']):
+    bow, count = find_bow([tweet])
+    word_list = list(bow.keys()) # finding bag of words for a sample
+    avg_vector = np.zeros(300) 
     for word in word_list:
       try:
-        avg_vector += word_vectors.word_vec(word)
-        count += 1 
+        avg_vector += model.get_vector(word) # finding vectors of these words
       except:
         not_found += 1
     if count != 0:
-      df['vectors'][i] = avg_vector/count
-  print(str(not_found) + " words are not found")
+      df['vectors'][i] = avg_vector/count # taking average of all words in bag of words for this sample 
+  
+  print("Average words which are not found in sentences : " + str(not_found/len(df)))
 
+  # drop sample if any word in sample is not in vocabulary
   drop_list = []
   [drop_list.append(k) for k,i in enumerate(df['vectors']) if i.sum() == 0]
-  print("Dropped lines " + str(len(drop_list)))
+  print("Dropped lines after vectorization: " + str(len(drop_list)))
   df = df.drop(drop_list).reset_index(drop=True)
+  print("Number of remaining samples: " + str(len(df)))
 
-  print("Number of tweets: " + str(len(df)))
+  print("Value counts for categories :\n")
+  print(df['category'].value_counts())
 
   return df.drop(['vectors'], axis=1), df['vectors']
 
 if __name__ == "__main__":
 
     file_path = args.file_path
-    keywords = args.keywords.split()
+    df = pd.read_csv(file_path)
+    
     stemming = args.stemming
     output_dir = args.output_dir
 
@@ -125,9 +122,15 @@ if __name__ == "__main__":
     elif stemming == "False":
       stemming_tf = False 
     
-    df, vectors = clean_tweets(file_path, keywords, stemming_tf)
-    df['labels'] = np.zeros((len(df)))
-    df['labels'] = args.label
+    word2vec_file = args.model_path
+
+    model = KeyedVectors.load_word2vec_format(word2vec_file)
+
+    with open(args.assign_labels_dict, 'rb') as f:
+      assign_labels_dict = pickle.load(f)
+
+    df, vectors = prepare_data(df, model, stemming_tf)
+    df = assing_labels(df, assing_labels_dict)
 
     df.to_csv(output_dir + "/preprocessed_" + keywords[0] + ".csv", index=False)
     with open(output_dir + '/vectors_' + keywords[0] + '.npy', 'wb') as f:
