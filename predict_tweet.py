@@ -19,9 +19,10 @@ from utils.preprocessing_utils import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--preprocessed_path', type=str, required=True)
+parser.add_argument('--model_path', type=str, required=True)
 args = parser.parse_args()
 
-def predict_text(text, assign_dict, kmeans, model):
+def predict_text(text, assign_dict, kmeans, model, df):
   '''
     - text (str)               : string for prediction
     - dict_for_clusters (dict) : dictionary for cluster labels of hashtags
@@ -68,11 +69,19 @@ if __name__ == "__main__":
         kmeans = pickle.load(f)
     with open(args.preprocessed_path + "/assign_dict.pkl", "rb") as f:
         assign_dict = pickle.load(f)
-    with open(args.model_path, "rb") as f:
-        model = pickle.load(f)
+    
+    df = pd.read_csv(args.preprocessed_path + '/df_with_clusters.csv')
 
+    word2vec_file = args.model_path
+    model = KeyedVectors.load_word2vec_format(word2vec_file)
 
-    text = input("Enter your tweet text for prediction: ")
-    prediction = predict_text(text, assign_dict, kmeans, model)
+    text = input("\n\nEnter your tweet text for prediction: ")
+    prediction = predict_text(text, assign_dict, kmeans, model, df)
 
     print("\nThis tweet is about to \n" + prediction + "\n\n")
+
+
+
+
+
+

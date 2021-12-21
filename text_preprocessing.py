@@ -19,7 +19,7 @@ import pickle
 parser = argparse.ArgumentParser()
 parser.add_argument('--file_path', type=str, required=True)
 parser.add_argument('--model_path', type=str, required=True)
-parser.add_argument('--assing_labels_dict', type=str, required=True)
+parser.add_argument('--assign_labels_dict', type=str, required=True)
 parser.add_argument('--stemming', type=str, required=True)
 parser.add_argument('--output_dir', type=str, required=True)
 
@@ -130,8 +130,8 @@ if __name__ == "__main__":
       assign_labels_dict = pickle.load(f)
 
     df, vectors = prepare_data(df, model, stemming_tf)
-    df = assing_labels(df, assing_labels_dict)
+    df = assign_labels(df, assign_labels_dict)
 
-    df.to_csv(output_dir + "/preprocessed_" + keywords[0] + ".csv", index=False)
-    with open(output_dir + '/vectors_' + keywords[0] + '.npy', 'wb') as f:
+    df.to_csv(output_dir + "/preprocessed.csv", index=False)
+    with open(output_dir + '/vectors.npy', 'wb') as f:
       np.save(f, vectors, allow_pickle=True)

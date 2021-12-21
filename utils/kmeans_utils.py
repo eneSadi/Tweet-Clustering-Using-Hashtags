@@ -25,13 +25,13 @@ def average_entropy(df):
     sum_ent = 0
     n_clusters = len(df['clusters'].value_counts())
     for i in range(n_clusters):
-    sum_ent += ent(df[df['clusters'] == i]['labels'])
+      sum_ent += ent(df[df['clusters'] == i]['labels'])
     return sum_ent/n_clusters
 
 def check_cluster_dist(df, cluster):
     ctrl_df = pd.DataFrame(df[df['clusters'] == cluster]['labels'].value_counts()).reset_index()
 
     for i in range(len(ctrl_df)):
-    ctrl_df['index'][i] = assign_dict[ctrl_df['index'][i]]
+      ctrl_df['index'][i] = assign_dict[ctrl_df['index'][i]]
 
     return ctrl_df
